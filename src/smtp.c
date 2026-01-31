@@ -3,6 +3,7 @@
 #include <openssl/ssl.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "util.h"
@@ -24,7 +25,7 @@ static void parse_mail(const char *cmd, char *out) {
 
 cmd_result_t handle_smtp_command(smtp_session_t *session, const char *cmd) {
     char lower_cmd[256];
-    int cmd_len = strlen(cmd);
+    size_t cmd_len = strlen(cmd);
     strncpy(lower_cmd, cmd, cmd_len);
     lower_cmd[cmd_len] = '\0';
 
