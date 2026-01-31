@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,6 @@
 #include "smtp.h"
 #include "util.h"
 
-#define PORT 2525
 #define MAX_EVENTS 10
 
 SSL_CTX *global_ssl_context = NULL;
@@ -55,9 +55,10 @@ cmd_result_t handle_smtp_client(smtp_session_t *session) {
         session->buffer[session->buffer_offset] = '\0';
 
         if (session->state == STATE_DATA) {
+            printf("%s\n", session->buffer);
             char *term = strstr(session->buffer, "\r\n.\r\n");
             if (term) {
-                send_response(session, "250 OK: Message accepted for delivery\r\n");
+                send_response(session, "250 OK Message accepted for delivery\r\n");
                 session->state = STATE_EHLO;
 
                 session->buffer_offset = 0;
@@ -71,7 +72,7 @@ cmd_result_t handle_smtp_client(smtp_session_t *session) {
         while ((line_end = strstr(line_start, "\r\n")) != NULL) {
             *line_end = '\0';
 
-            printf("Command: %s\n", line_start);
+            printf("C: %s\n", line_start);
             if (handle_smtp_command(session, line_start) == CMD_CLOSE) {
                 return CMD_CLOSE;
             }
@@ -106,7 +107,20 @@ cmd_result_t handle_smtp_client(smtp_session_t *session) {
     return CMD_OK;
 }
 
+volatile sig_atomic_t keep_running = 1;
+
+void handle_sigint(int sig) {
+    (void)sig;
+    keep_running = 0;
+}
+
 int main(void) {
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, handle_sigint);
+
+    load_env(".env");
+    const int port = get_port();
+
     init_openssl();
     int sckt = socket(AF_INET, SOCK_STREAM, 0);
     if(sckt < 0) handle_critical_err("Socket creation failed.", sckt);
@@ -117,7 +131,7 @@ int main(void) {
 
     const struct sockaddr_in addr = {
         .sin_family = AF_INET,
-        .sin_port = htons(PORT),
+        .sin_port = htons(port),
         .sin_addr = {INADDR_ANY},
         .sin_zero = {0},
     };
@@ -139,9 +153,9 @@ int main(void) {
         handle_critical_err("epoll_ctl failed", sckt);
     }
 
-    printf("SMTP Server listening on port %d\n", PORT);
+    printf("SMTP Server listening on port %d\n", port);
 
-    while (1) {
+    while (keep_running) {
         int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
         for (int i = 0; i < nfds; i++) {
             if (events[i].data.fd == sckt) {
@@ -178,10 +192,20 @@ int main(void) {
 
                 if (result == CMD_CLOSE) {
                     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, session->fd, NULL);
+                    if (session->is_tls && session->ssl) {
+                        SSL_free(session->ssl);
+                    }
                     close(session->fd);
                     free(session);
                 }
             }
         }
     }
+
+    SSL_CTX_free(global_ssl_context);
+    EVP_cleanup();
+    CRYPTO_cleanup_all_ex_data();
+    ERR_free_strings();
+
+    OSSL_LIB_CTX_free(NULL);
 }

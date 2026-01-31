@@ -1,6 +1,8 @@
-#include "smtp.h"
 #include <openssl/ssl.h>
 #include <sys/socket.h>
+
+#include "smtp.h"
+#include "util.h"
 
 void logg(long line, const char *file, const char *func, const char *format, ...) {
     time_t raw_time;
@@ -58,3 +60,35 @@ ssize_t read_request(smtp_session_t *s, char *msg, int size) {
     }
 }
 
+int load_env(const char *path){
+    FILE *f = fopen(path, "r");
+    if(!f){
+        LOG("Failed to open .env");
+        return -1;
+    }
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        *(strchr(line, '\n')) = '\0';
+
+        char *key = strtok(line, "=");
+        char *value = strtok(NULL, "=");
+
+        if(key && value){
+            int result = setenv(key, value, 1);
+            if(result != 0) LOG("setenv failed");
+        }
+
+    }
+    fclose(f);
+    return 0;
+}
+
+const char *get_db_password(void) {
+    const char *key = getenv("DB_PASSWORD");
+    return key;
+}
+
+int get_port(void) {
+    const char *port = getenv("PORT");
+    return port ? strtol(port, NULL, 10) : 25;
+}

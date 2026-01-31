@@ -28,17 +28,19 @@ cmd_result_t handle_smtp_command(smtp_session_t *session, const char *cmd) {
     strncpy(lower_cmd, cmd, cmd_len);
     lower_cmd[cmd_len] = '\0';
 
-    for(int i = 0; lower_cmd[i] != '\0'; i++) {
-        lower_cmd[i] = (unsigned char)tolower(cmd[i]);
-    }
+    if (cmd_len >= sizeof(lower_cmd)) cmd_len = sizeof(lower_cmd) - 1;
 
-    if(strncmp(lower_cmd, "helo", 4) == 0) {
-        send_response(session, "250 e45g.org OK\r\n");
-        session->state = STATE_MAIL_FROM;
+    for(size_t i = 0; i < cmd_len; i++) {
+        lower_cmd[i] = (unsigned char)tolower((unsigned char)cmd[i]);
     }
+    lower_cmd[cmd_len] = '\0';
 
-    else if(strncmp(lower_cmd, "ehlo", 4) == 0) {
-        send_response(session, "250-e45g.org OK\r\n250 STARTTLS\r\n");
+    if(strncmp(lower_cmd, "helo", 4) == 0 || strncmp(lower_cmd, "ehlo", 4) == 0) {
+        if (lower_cmd[0] == 'e') {
+            send_response(session, "250-e45g.org OK\r\n250 STARTTLS\r\n");
+        } else {
+            send_response(session, "250 e45g.org. Oh, look, another connection.\r\n");
+        }
         session->state = STATE_MAIL_FROM;
     }
 
@@ -67,23 +69,23 @@ cmd_result_t handle_smtp_command(smtp_session_t *session, const char *cmd) {
 
     else if(strncmp(lower_cmd, "mail from", 9) == 0) {
         parse_mail(lower_cmd, session->sender);
-        send_response(session, "250 OK\r\n");
+        send_response(session, "250 I've seen worse addresses, I guess.\r\n");
         session->state = STATE_RCPT_TO;
     }
 
     else if(strncmp(lower_cmd, "rcpt to", 7) == 0) {
         if(session->recipient_count < MAX_REC) {
             parse_mail(lower_cmd, session->recipients[session->recipient_count++]);
-            send_response(session, "250 OK\r\n");
+            send_response(session, "250 Recipient accepted. I hope they actually want this junk.\r\n");
         }
     }
 
     else if (strncmp(lower_cmd, "data", 4) == 0) {
-        if (session->state != STATE_RCPT_TO) {
+        if (session->state != STATE_RCPT_TO || session->recipient_count == 0) {
             send_response(session, "503 Error: need RCPT command\r\n");
             return CMD_OK;
         }
-        send_response(session, "354 Start mail input; end with <CR><LF>.<CR><LF>\r\n");
+        send_response(session, "354 Start mail input\r\n");
         session->state = STATE_DATA;
     }
 
@@ -100,7 +102,7 @@ cmd_result_t handle_smtp_command(smtp_session_t *session, const char *cmd) {
     }
 
     else {
-        send_response(session, "500 Unknown command\r\n");
+        send_response(session, "500 I have no idea what you're talking about. Maybe try a real command?\r\n");
     }
 
     return CMD_OK;
