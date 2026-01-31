@@ -3,7 +3,7 @@ TARGET = mmail
 CC = gcc
 SRCS = $(wildcard src/**.c)
 CFLAGS = -Wall -Wextra
-LDFLAGS = -lssl -lcrypto
+LDFLAGS = -lssl -lcrypto -lpq
 
 all: compile run
 

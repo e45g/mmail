@@ -4,6 +4,7 @@
 #include <openssl/err.h>
 
 #define MAX_REC 10
+#define BUFFER_SIZE 1024*1024
 
 typedef enum {
     STATE_EHLO,
@@ -23,10 +24,13 @@ typedef struct {
     int is_tls;
     SSL *ssl;
     smtp_state_t state;
+
+    char buffer[BUFFER_SIZE];
+    int buffer_offset;
+
     char sender[256];
     char recipients[MAX_REC][256];
     int recipient_count;
 } smtp_session_t;
 
 cmd_result_t handle_smtp_command(smtp_session_t*, const char*);
-void send_response(smtp_session_t *s, const char *msg);

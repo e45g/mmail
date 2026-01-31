@@ -1,27 +1,24 @@
+#include <ctype.h>
 #include <fcntl.h>
 #include <openssl/ssl.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "util.h"
 #include "smtp.h"
 
 extern SSL_CTX *global_ssl_context;
-
-inline void send_response(smtp_session_t *s, const char *msg) {
-    if (s->is_tls) {
-        SSL_write(s->ssl, msg, strlen(msg));
-    } else {
-        send(s->fd, msg, strlen(msg), 0);
-    }
-}
 
 static void parse_mail(const char *cmd, char *out) {
     const char *start = strchr(cmd, '<');
     const char *end = strchr(cmd, '>');
     if(start && end) {
-        strncpy(out, start+1, end - start - 1);
-        out[end-start-1] = '\0';
+        size_t len = end - start - 1;
+        if(len < 256 && len > 0) {
+            strncpy(out, start+1, end - start - 1);
+            out[end-start-1] = '\0';
+        }
     }
 }
 
@@ -32,7 +29,7 @@ cmd_result_t handle_smtp_command(smtp_session_t *session, const char *cmd) {
     lower_cmd[cmd_len] = '\0';
 
     for(int i = 0; lower_cmd[i] != '\0'; i++) {
-        if(lower_cmd[i] >= 'A' && lower_cmd[i] <= 'Z') lower_cmd[i] += 0x20;
+        lower_cmd[i] = (unsigned char)tolower(cmd[i]);
     }
 
     if(strncmp(lower_cmd, "helo", 4) == 0) {
@@ -65,7 +62,7 @@ cmd_result_t handle_smtp_command(smtp_session_t *session, const char *cmd) {
         fcntl(session->fd, F_SETFL, flags);
         session->is_tls = 1;
 
-        return CMD_OK;
+        session->state = STATE_EHLO;
     }
 
     else if(strncmp(lower_cmd, "mail from", 9) == 0) {

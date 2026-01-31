@@ -13,7 +13,7 @@ context.verify_mode = ssl.CERT_NONE
 
 try:
     # Connect to your server
-    server = smtplib.SMTP("localhost", 2525)
+    server = smtplib.SMTP("http://mail.e45g.org", 25)
     server.set_debuglevel(1)  # Prints the SMTP traffic to your terminal
 
     server.ehlo()            # Identify yourself

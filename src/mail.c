@@ -8,6 +8,7 @@
 #include <fcntl.h>
 
 #include "smtp.h"
+#include "util.h"
 
 #define PORT 2525
 #define MAX_EVENTS 10
@@ -46,49 +47,61 @@ void init_openssl() {
 cmd_result_t handle_smtp_client(smtp_session_t *session) {
     ssize_t r;
 
-    if(session->state == STATE_DATA) {
-        char buf[4096];
+    while ((r = read_request(session,
+                             session->buffer + session->buffer_offset,
+                             BUFFER_SIZE - session->buffer_offset - 1)
+           ) > 0) {
+        session->buffer_offset += r;
+        session->buffer[session->buffer_offset] = '\0';
 
-        if (session->is_tls) {
-            r = SSL_read(session->ssl, buf, sizeof(buf) - 1);
-        } else {
-            r = recv(session->fd, buf, sizeof(buf) - 1, 0);
-        }
-
-        if(r > 0) {
-            buf[r] = '\0';
-            printf("%s\n", buf);
-            //NOTE: \r\n.\r\n could possibly me sent across two packets
-            if(strstr(buf, "\r\n.\r\n") != NULL || strcmp(buf, ".\r\n") == 0) {
+        if (session->state == STATE_DATA) {
+            char *term = strstr(session->buffer, "\r\n.\r\n");
+            if (term) {
                 send_response(session, "250 OK: Message accepted for delivery\r\n");
                 session->state = STATE_EHLO;
+
+                session->buffer_offset = 0;
+                memset(session->buffer, 0, BUFFER_SIZE);
             }
-        } else if (r == 0) {
+            return CMD_OK;
+        }
+
+        char *line_start = session->buffer;
+        char *line_end;
+        while ((line_end = strstr(line_start, "\r\n")) != NULL) {
+            *line_end = '\0';
+
+            printf("Command: %s\n", line_start);
+            if (handle_smtp_command(session, line_start) == CMD_CLOSE) {
+                return CMD_CLOSE;
+            }
+
+            line_start = line_end + 2;
+
+            if (session->state == STATE_DATA) break;
+        }
+
+        int remaining = session->buffer_offset - (line_start - session->buffer);
+        if (remaining > 0 && line_start != session->buffer) {
+            memmove(session->buffer, line_start, remaining);
+            session->buffer_offset = remaining;
+        } else if (remaining <= 0) {
+            session->buffer_offset = 0;
+        }
+
+        if (session->buffer_offset >= BUFFER_SIZE - 1) {
+            send_response(session, "500 Line too long\r\n");
             return CMD_CLOSE;
         }
-    } else {
-        char buf[1024];
 
-        if (session->is_tls) {
-            r = SSL_read(session->ssl, buf, sizeof(buf) - 1);
-        } else {
-            r = recv(session->fd, buf, sizeof(buf) - 1, 0);
+    }
+    if (r == 0) {
+        return CMD_CLOSE;
+    } else if (r < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return CMD_OK;
         }
-
-        if (r > 0) {
-            buf[r] = '\0';
-            char *line = strtok(buf, "\r\n");
-            while (line) {
-                printf("%s\n", line);
-                cmd_result_t result = handle_smtp_command(session, line);
-                if (result == CMD_CLOSE) return CMD_CLOSE;
-                if(session->state == STATE_DATA) break;
-
-                line = strtok(NULL, "\r\n");
-            }
-        } else if (r == 0) {
-            return CMD_CLOSE;
-        }
+        return CMD_CLOSE;
     }
     return CMD_OK;
 }
@@ -135,12 +148,9 @@ int main(void) {
                 int client_fd = accept(sckt, NULL, NULL);
                 if (client_fd == -1) continue;
 
-                smtp_session_t *session = malloc(sizeof(smtp_session_t));
+                smtp_session_t *session = calloc(1, sizeof(smtp_session_t));
                 session->fd = client_fd;
                 session->state = STATE_EHLO;
-                session->recipient_count = 0;
-                session->ssl = NULL;
-                session->is_tls = 0;
 
                 if (set_non_blocking(client_fd) == -1) {
                     close(client_fd);
