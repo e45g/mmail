@@ -3,7 +3,11 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
-#define MAX_REC 10
+#define MAX_RECIPIENTS 10
+#define MAX_EMAIL_LEN 512
+#define MAX_USER_LEN 256
+#define MAX_DOMAIN_LEN 256
+
 #define BUFFER_SIZE 1024*1024
 
 typedef enum {
@@ -28,9 +32,12 @@ typedef struct {
     char buffer[BUFFER_SIZE];
     int buffer_offset;
 
-    char sender[256];
-    char recipients[MAX_REC][256];
+    char sender[MAX_EMAIL_LEN];
+    char recipients[MAX_RECIPIENTS][MAX_EMAIL_LEN];
     int recipient_count;
 } smtp_session_t;
 
 cmd_result_t handle_smtp_command(smtp_session_t*, const char*);
+int store_email(smtp_session_t *s);
+int mail_run();
+

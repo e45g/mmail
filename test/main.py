@@ -9,7 +9,7 @@ class TestMMailServer(unittest.TestCase):
     def setUpClass(cls):
         # Configuration matches your server defaults
         cls.host = "localhost"
-        cls.port = 2525
+        cls.port = 25
         cls.sender = "test@example.com"
         cls.receiver = "admin@e45g.org"
 

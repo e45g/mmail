@@ -1,0 +1,32 @@
+-- 1. Users Table
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(255) NOT NULL,
+    domain VARCHAR(255) NOT NULL,
+    full_address VARCHAR(511) GENERATED ALWAYS AS (username || '@' || domain) STORED,
+    password_hash TEXT NOT NULL,
+    UNIQUE(username, domain),
+    UNIQUE(full_address)
+);
+
+-- 2. Emails Table
+CREATE TABLE emails (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sender_address TEXT NOT NULL,
+    subject TEXT,                      -- Extracted from DATA
+    snippet TEXT,                      -- First few chars for preview
+    file_path TEXT NOT NULL,           -- Path to the .eml on disk
+    size_bytes INT NOT NULL,           -- idk, for fun
+    received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. User Inbox (Delivery Table)
+CREATE TABLE user_inbox (
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    email_id UUID REFERENCES emails(id) ON DELETE CASCADE,
+    is_read BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP WITH TIME ZONE, -- may be useful later
+    PRIMARY KEY (user_id, email_id)
+);
+
+CREATE INDEX idx_inbox_fast_load ON user_inbox(user_id, deleted_at) INCLUDE (email_id, is_read);

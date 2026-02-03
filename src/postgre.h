@@ -17,7 +17,7 @@ void db_close(void);
 
 db_result_t *db_exec(const char *query);
 db_result_t *db_query(char *query, const char **params, int params_count);
-void free_result(db_result_t *result);
+void db_free(db_result_t *result);
 
 int db_execute(const char *sql, const char **params, int param_count);
 db_result_t *db_prepare(const char *query, const char **params, int param_count);

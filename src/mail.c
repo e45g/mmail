@@ -8,6 +8,7 @@
 #include <sys/epoll.h>
 #include <fcntl.h>
 
+#include "postgre.h"
 #include "smtp.h"
 #include "util.h"
 
@@ -58,9 +59,15 @@ cmd_result_t handle_smtp_client(smtp_session_t *session) {
             printf("%s\n", session->buffer);
             char *term = strstr(session->buffer, "\r\n.\r\n");
             if (term) {
-                send_response(session, "250 OK Message accepted for delivery\r\n");
-                session->state = STATE_EHLO;
+                *term = '\0';
 
+                if (store_email(session) == 0) {
+                    send_response(session, "250 OK Message accepted for delivery\r\n");
+                } else {
+                    send_response(session, "451 Local error in processing\r\n");
+                }
+
+                session->state = STATE_EHLO;
                 session->buffer_offset = 0;
                 memset(session->buffer, 0, BUFFER_SIZE);
             }
@@ -114,11 +121,10 @@ void handle_sigint(int sig) {
     keep_running = 0;
 }
 
-int main(void) {
+int mail_run(void) {
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT, handle_sigint);
 
-    load_env(".env");
     const int port = get_port();
 
     init_openssl();
@@ -201,11 +207,5 @@ int main(void) {
             }
         }
     }
-
-    SSL_CTX_free(global_ssl_context);
-    EVP_cleanup();
-    CRYPTO_cleanup_all_ex_data();
-    ERR_free_strings();
-
-    OSSL_LIB_CTX_free(NULL);
+    return 0;
 }

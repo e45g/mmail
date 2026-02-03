@@ -124,3 +124,21 @@ db_result_t *db_prepare(const char *query, const char **params, int param_count)
     return result;
 
 }
+
+void db_free(db_result_t *result) {
+    if (!result) return;
+
+    for (int i = 0; i < result->num_rows; i++) {
+        for (int j = 0; j < result->num_cols; j++) {
+            free(result->rows[i][j]);
+        }
+        free(result->rows[i]);
+    }
+    free(result->rows);
+
+    for (int i = 0; i < result->num_cols; i++) {
+        free(result->col_names[i]);
+    }
+    free(result->col_names);
+    free(result);
+}
