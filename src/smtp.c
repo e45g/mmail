@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <ctype.h>
 #include <fcntl.h>
 #include <openssl/ssl.h>

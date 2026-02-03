@@ -1,8 +1,2 @@
-server
-cxc
-log.txt
 src/cxc/*
-.env
-cx_files/*
 routes/*
-src/main.c

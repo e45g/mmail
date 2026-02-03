@@ -1,0 +1,65 @@
+({
+    char *error_message;
+    char *domain;
+})
+
+#include <stdio.h>
+#include <string.h>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - mmail</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container-sm">
+        <div class="card">
+            <div class="auth-header">
+                <h1>mmail</h1>
+                <p>Create your email account</p>
+            </div>
+
+            {{
+                if (props->error_message && strlen(props->error_message) > 0) {
+                    char err_html[512];
+                    snprintf(err_html, sizeof(err_html),
+                        "<div class=\"error\">%s</div>",
+                        props->error_message);
+                    fast_strcat(output, err_html);
+                }
+            }}
+
+            <form method="POST" action="/register">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required placeholder="your.name">
+                </div>
+
+                <div class="form-group">
+                    <label for="domain">Domain</label>
+                    <input type="text" id="domain" name="domain" value="{{=props->domain}}" placeholder="example.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required minlength="6">
+                </div>
+
+                <div class="form-group">
+                    <label for="password_confirm">Confirm Password</label>
+                    <input type="password" id="password_confirm" name="password_confirm" required minlength="6">
+                </div>
+
+                <button type="submit" class="btn btn-block">Create Account</button>
+            </form>
+
+            <div class="auth-footer">
+                Already have an account? <a href="/login">Sign in</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

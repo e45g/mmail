@@ -1,0 +1,81 @@
+({
+    #include "db.h"
+    char *username;
+    char *full_address;
+    db_result_t *emails;
+})
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "utils.h"
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox - mmail</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="nav">
+            <span class="nav-brand">mmail</span>
+            <div class="nav-links">
+                <span class="text-muted">{{=props->full_address}}</span>
+                <a href="/logout">Sign out</a>
+            </div>
+        </nav>
+
+        <div class="page-header">
+            <h1>Inbox</h1>
+        </div>
+
+        {{
+            if (props->emails == NULL || props->emails->num_rows == 0) {
+                fast_strcat(output, "<div class=\"email-list\"><div class=\"empty-state\">No emails yet</div></div>");
+            } else {
+                fast_strcat(output, "<div class=\"email-list\">");
+                for (int i = 0; i < props->emails->num_rows; i++) {
+                    char item[4096];
+                    const char *email_id = props->emails->rows[i][0];
+                    const char *sender = props->emails->rows[i][1];
+                    const char *subject = props->emails->rows[i][2];
+                    const char *snippet = props->emails->rows[i][3];
+                    const char *received = props->emails->rows[i][4];
+                    const char *is_read = props->emails->rows[i][5];
+
+                    const char *unread_class = (strcmp(is_read, "f") == 0) ? " unread" : "";
+
+                    // Escape HTML to prevent XSS
+                    char *safe_sender = html_escape(sender);
+                    char *safe_subject = html_escape(subject && strlen(subject) > 0 ? subject : "(No subject)");
+                    char *safe_snippet = html_escape(snippet && strlen(snippet) > 0 ? snippet : "");
+
+                    snprintf(item, sizeof(item),
+                        "<a href=\"/email/%s\" class=\"email-item%s\" style=\"text-decoration:none;color:inherit;\">"
+                        "<div class=\"email-content\">"
+                        "<div class=\"email-sender\">%s</div>"
+                        "<div class=\"email-subject\">%s</div>"
+                        "<div class=\"email-snippet\">%s</div>"
+                        "</div>"
+                        "<div class=\"email-date\">%s</div>"
+                        "</a>",
+                        email_id, unread_class,
+                        safe_sender ? safe_sender : "",
+                        safe_subject ? safe_subject : "(No subject)",
+                        safe_snippet ? safe_snippet : "",
+                        received);
+                    fast_strcat(output, item);
+
+                    free(safe_sender);
+                    free(safe_subject);
+                    free(safe_snippet);
+                }
+                fast_strcat(output, "</div>");
+            }
+        }}
+    </div>
+</body>
+</html>

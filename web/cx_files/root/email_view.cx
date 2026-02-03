@@ -1,0 +1,55 @@
+({
+    char *full_address;
+    char *email_id;
+    char *from;
+    char *to;
+    char *subject;
+    char *date;
+    char *body;
+})
+
+#include <stdio.h>
+#include <string.h>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{=props->subject}} - mmail</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="nav">
+            <span class="nav-brand">mmail</span>
+            <div class="nav-links">
+                <span class="text-muted">{{=props->full_address}}</span>
+                <a href="/logout">Sign out</a>
+            </div>
+        </nav>
+
+        <div class="mb-4">
+            <a href="/">&larr; Back to Inbox</a>
+        </div>
+
+        <div class="email-view">
+            <div class="email-header">
+                <h1>{{=props->subject}}</h1>
+                <div class="email-meta">
+                    <div class="email-meta-row">
+                        <span class="email-meta-label">From:</span> {{=props->from}}
+                    </div>
+                    <div class="email-meta-row">
+                        <span class="email-meta-label">To:</span> {{=props->to}}
+                    </div>
+                    <div class="email-meta-row">
+                        <span class="email-meta-label">Date:</span> {{=props->date}}
+                    </div>
+                </div>
+            </div>
+            <div class="email-body">{{=props->body}}</div>
+        </div>
+    </div>
+</body>
+</html>
