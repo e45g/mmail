@@ -186,7 +186,6 @@ void handle_logout(int client_fd, http_req_t *req) {
         free(token);
     }
 
-    // Clear cookie and redirect
     send_redirect_with_cookie(client_fd, "/login",
         "session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
 }

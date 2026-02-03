@@ -55,7 +55,6 @@ cmd_result_t handle_smtp_client(smtp_session_t *session) {
         session->buffer[session->buffer_offset] = '\0';
 
         if (session->state == STATE_DATA) {
-            printf("%s\n", session->buffer);
             char *term = strstr(session->buffer, "\r\n.\r\n");
             if (term) {
                 *term = '\0';
@@ -70,7 +69,7 @@ cmd_result_t handle_smtp_client(smtp_session_t *session) {
                 session->buffer_offset = 0;
                 memset(session->buffer, 0, BUFFER_SIZE);
             }
-            return CMD_OK;
+            continue;
         }
 
         char *line_start = session->buffer;
