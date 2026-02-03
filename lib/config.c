@@ -40,3 +40,10 @@ int get_web_port(void) {
     const char *port = getenv("WEB_PORT");
     return port ? strtol(port, NULL, 10) : 3000;
 }
+
+const char *get_web_subdomain(void) {
+    const char *sub = getenv("WEB_SUBDOMAIN");
+    // Return NULL if empty or not set
+    if (!sub || sub[0] == '\0') return NULL;
+    return sub;
+}

@@ -332,23 +332,25 @@ void handle_log(int client_fd, http_req_t *req __attribute__((unused))) {
 }
 
 void load_routes() {
+    const char *sub = get_web_subdomain();
+
     // Static files
-    add_route("GET", "/robots.txt", NULL, handle_robots);
-    add_route("GET", "/css/*", NULL, handle_static);
+    add_route("GET", "/robots.txt", sub, handle_robots);
+    add_route("GET", "/css/*", sub, handle_static);
 
     // Auth routes
-    add_route("GET", "/login", NULL, handle_login_page);
-    add_route("POST", "/login", NULL, handle_login_submit);
-    add_route("GET", "/register", NULL, handle_register_page);
-    add_route("POST", "/register", NULL, handle_register_submit);
-    add_route("GET", "/logout", NULL, handle_logout);
+    add_route("GET", "/login", sub, handle_login_page);
+    add_route("POST", "/login", sub, handle_login_submit);
+    add_route("GET", "/register", sub, handle_register_page);
+    add_route("POST", "/register", sub, handle_register_submit);
+    add_route("GET", "/logout", sub, handle_logout);
 
     // Protected routes
-    add_route("GET", "/", NULL, handle_inbox);
-    add_route("GET", "/email/*", NULL, handle_email_view);
+    add_route("GET", "/", sub, handle_inbox);
+    add_route("GET", "/email/*", sub, handle_email_view);
 
     // Debug
-    add_route("GET", "/log", NULL, handle_log);
+    add_route("GET", "/log", sub, handle_log);
 }
 
 // Standalone entry point (used when building web server separately)

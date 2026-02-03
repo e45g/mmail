@@ -111,12 +111,9 @@ int validate_header(const char* name, const char* value) {
         if (!isalnum(c) && c != '-' && c != '_') return 0;
     }
 
-    const char* forbidden_headers[] = {"content-length", "transfer-encoding"};
-    const int num_forbidden = sizeof(forbidden_headers) / sizeof(forbidden_headers[0]);
-
-    for (int i = 0; i < num_forbidden; i++) {
-        if (strcasecmp(name, forbidden_headers[i]) == 0) return 0;
-    }
+    // Note: Content-Length is needed for body parsing, don't filter it
+    // Transfer-Encoding chunked is not supported
+    if (strcasecmp(name, "transfer-encoding") == 0) return 0;
 
     return 1;
 }
