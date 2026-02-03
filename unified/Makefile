@@ -4,8 +4,16 @@ BIN_DIR = $(BUILD_DIR)/bin
 LIB_BUILD_DIR = $(BUILD_DIR)/lib
 
 CC ?= gcc
-CFLAGS ?= -Wall -Wextra -O2
-CFLAGS += -I../lib -I../src -I../web/src -DUNIFIED_BUILD
+BASE_CFLAGS ?= -Wall -Wextra
+
+# Use pkg-config for portable library detection
+PKG_CONFIG ?= pkg-config
+PQ_CFLAGS := $(shell $(PKG_CONFIG) --cflags libpq 2>/dev/null)
+PQ_LIBS := $(shell $(PKG_CONFIG) --libs libpq 2>/dev/null || echo "-lpq")
+SSL_CFLAGS := $(shell $(PKG_CONFIG) --cflags openssl 2>/dev/null)
+SSL_LIBS := $(shell $(PKG_CONFIG) --libs openssl 2>/dev/null || echo "-lssl -lcrypto")
+
+CFLAGS = $(BASE_CFLAGS) $(PQ_CFLAGS) $(SSL_CFLAGS) -I../lib -I../src -I../web/src -DUNIFIED_BUILD
 
 SMTP_DIR = ../src
 WEB_DIR = ../web/src
@@ -20,7 +28,7 @@ ALL_SRCS = $(UNIFIED_SRCS) $(SMTP_SRCS) $(WEB_SRCS)
 
 TARGET = $(BIN_DIR)/mmail
 
-LDFLAGS = -L$(LIB_BUILD_DIR) -lmmail -lpq -lssl -lcrypto -lcrypt
+LDFLAGS = -L$(LIB_BUILD_DIR) -lmmail $(PQ_LIBS) $(SSL_LIBS) -lcrypt
 
 .PHONY: all dirs clean
 

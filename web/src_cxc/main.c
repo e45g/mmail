@@ -393,8 +393,11 @@ int generate(FILE *f, const char *filename, long length, char *ctemp,
     char h_prepend[BUFFER_SIZE] = {0};
     char props_members[BUFFER_SIZE] = {0};
 
-    char *props_start = strstr(content, "({") + 2;
-    if (props_start != NULL) {
+    char *body_start = content;  // Where to start looking for prepend/HTML
+    char *props_marker = strstr(content, "({");
+
+    if (props_marker != NULL) {
+        char *props_start = props_marker + 2;
         char *props_end = strstr(props_start, "})");
         if (props_end != NULL) {
             char full_props_block[BUFFER_SIZE] = {0};
@@ -411,20 +414,27 @@ int generate(FILE *f, const char *filename, long length, char *ctemp,
                 }
                 line = strtok(NULL, "\n");
             }
+            // Skip past the props block for body content
+            body_start = props_end + 2;
         }
-    } else {
-        props_start = content;
     }
 
-    char *first_html = strstr(props_start, "\n<");
+    char *first_html = strstr(body_start, "\n<");
     if (first_html == NULL) {
-        perror("No HTML found, aborting");
-        free(content);
-        return -1;
+        first_html = strstr(body_start, "<!");  // Try without newline
+        if (first_html == NULL) {
+            perror("No HTML found, aborting");
+            free(content);
+            return -1;
+        }
+        // No prepend content before HTML
+        prepend[0] = '\0';
+    } else {
+        strncat(prepend, body_start, first_html - body_start);
+        first_html++;  // Skip the newline, now points to '<'
     }
-    strncat(prepend, props_start, first_html - props_start);
 
-    char *ptr = first_html + 1;
+    char *ptr = first_html;  // Start at the '<'
     char *code_start, *code_end;
 
     while ((code_start = strstr(ptr, "{{")) && (code_end = strstr(ptr, "}}"))) {

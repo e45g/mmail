@@ -4,8 +4,14 @@ BIN_DIR = $(BUILD_DIR)/bin
 LIB_BUILD_DIR = $(BUILD_DIR)/lib
 
 CC ?= gcc
-CFLAGS ?= -Wall -Wextra -O2
-CFLAGS += -Isrc -I../lib
+BASE_CFLAGS ?= -Wall -Wextra
+
+# Use pkg-config for portable library detection
+PKG_CONFIG ?= pkg-config
+PQ_CFLAGS := $(shell $(PKG_CONFIG) --cflags libpq 2>/dev/null)
+PQ_LIBS := $(shell $(PKG_CONFIG) --libs libpq 2>/dev/null || echo "-lpq")
+
+CFLAGS = $(BASE_CFLAGS) $(PQ_CFLAGS) -Isrc -I../lib
 
 SRC_DIR = src
 
@@ -16,7 +22,7 @@ OBJS = $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC_FILES))
 TARGET = $(BIN_DIR)/mmail-web
 CXC = $(BIN_DIR)/cxc
 
-LDFLAGS = -lpq -lcrypt $(LIB_BUILD_DIR)/libmmail.a
+LDFLAGS = $(PQ_LIBS) -lcrypt $(LIB_BUILD_DIR)/libmmail.a
 
 .PHONY: all dirs clean cxc
 

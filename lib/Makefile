@@ -3,7 +3,14 @@ OBJ_DIR = $(BUILD_DIR)/obj/lib
 LIB_DIR = $(BUILD_DIR)/lib
 
 CC ?= gcc
-CFLAGS ?= -Wall -Wextra -O2
+BASE_CFLAGS ?= -Wall -Wextra
+
+# Use pkg-config for portable library detection
+PKG_CONFIG ?= pkg-config
+PQ_CFLAGS := $(shell $(PKG_CONFIG) --cflags libpq 2>/dev/null)
+
+CFLAGS = $(BASE_CFLAGS) $(PQ_CFLAGS)
+
 AR = ar
 ARFLAGS = rcs
 

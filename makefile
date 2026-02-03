@@ -1,6 +1,20 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -Ilib
-LDFLAGS = -lpq -lssl -lcrypto -lcrypt
+CFLAGS = -Wall -Wextra -Ilib
+
+# Use pkg-config for portable library detection (works across distros including Raspberry Pi OS)
+PKG_CONFIG ?= pkg-config
+
+# PostgreSQL flags (libpq)
+PQ_CFLAGS := $(shell $(PKG_CONFIG) --cflags libpq 2>/dev/null)
+PQ_LIBS := $(shell $(PKG_CONFIG) --libs libpq 2>/dev/null || echo "-lpq")
+
+# OpenSSL flags
+SSL_CFLAGS := $(shell $(PKG_CONFIG) --cflags openssl 2>/dev/null)
+SSL_LIBS := $(shell $(PKG_CONFIG) --libs openssl 2>/dev/null || echo "-lssl -lcrypto")
+
+# Combine all flags
+CFLAGS += $(PQ_CFLAGS) $(SSL_CFLAGS)
+LDFLAGS = $(PQ_LIBS) $(SSL_LIBS) -lcrypt
 
 # Build directories (absolute path for sub-makefiles)
 ROOT_DIR := $(shell pwd)
@@ -16,7 +30,7 @@ SRC_WEB = web
 SRC_UNIFIED = unified
 SRC_CXC = web/src_cxc
 
-export BUILD_DIR CC CFLAGS LDFLAGS
+export BUILD_DIR CC CFLAGS LDFLAGS PKG_CONFIG
 
 .PHONY: all dirs lib smtp web unified cxc clean help
 
