@@ -20,7 +20,6 @@
 
 #define DOMAIN "example.com"
 
-// Helper to get session or redirect
 static session_user_t *require_auth(int client_fd, http_req_t *req) {
     session_user_t *user = get_session_user(req);
     if (!user) {
@@ -121,12 +120,10 @@ void handle_register_submit(int client_fd, http_req_t *req) {
     char *password = get_form_field(fields, field_count, "password");
     char *password_confirm = get_form_field(fields, field_count, "password_confirm");
 
-    // Use configured domain if not provided
     if (!domain || strlen(domain) == 0) {
         domain = DOMAIN;
     }
 
-    // Validation
     if (!username || strlen(username) == 0) {
         RegisterProps props = { .error_message = "Username is required", .domain = DOMAIN };
         char *html = render_register(&props);
@@ -154,7 +151,6 @@ void handle_register_submit(int client_fd, http_req_t *req) {
         return;
     }
 
-    // Check username format (alphanumeric, dots, underscores)
     for (size_t i = 0; i < strlen(username); i++) {
         char c = username[i];
         if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
@@ -168,7 +164,6 @@ void handle_register_submit(int client_fd, http_req_t *req) {
         }
     }
 
-    // Create user
     int result = create_user(username, domain, password);
     free_form_fields(fields, field_count);
 
@@ -180,7 +175,6 @@ void handle_register_submit(int client_fd, http_req_t *req) {
         return;
     }
 
-    // Registration successful, redirect to login
     send_redirect(client_fd, "/login");
 }
 
@@ -233,7 +227,6 @@ void handle_email_view(int client_fd, http_req_t *req) {
     session_user_t *user = require_auth(client_fd, req);
     if (!user) return;
 
-    // Get email ID from wildcard
     const char *email_id = req->wildcards[0];
     if (!email_id || strlen(email_id) == 0) {
         send_redirect(client_fd, "/");
@@ -241,7 +234,6 @@ void handle_email_view(int client_fd, http_req_t *req) {
         return;
     }
 
-    // Get email details and verify ownership
     const char *query =
         "SELECT e.file_path, e.subject "
         "FROM emails e "
@@ -261,18 +253,14 @@ void handle_email_view(int client_fd, http_req_t *req) {
 
     const char *db_file_path = res->rows[0][0];
 
-    // Build path - check if running from project root or web/ directory
     char file_path[512];
     struct stat st;
     if (stat("emails", &st) == 0 && S_ISDIR(st.st_mode)) {
-        // Running from project root (unified binary)
         snprintf(file_path, sizeof(file_path), "%s", db_file_path);
     } else {
-        // Running from web/ directory (standalone)
         snprintf(file_path, sizeof(file_path), "../%s", db_file_path);
     }
 
-    // Mark as read
     const char *mark_read_query =
         "UPDATE user_inbox SET is_read = TRUE "
         "WHERE email_id = $1 AND user_id = (SELECT id FROM users WHERE full_address = $2)";
@@ -280,7 +268,6 @@ void handle_email_view(int client_fd, http_req_t *req) {
     db_result_t *mark_res = db_prepare(mark_read_query, mark_params, 2);
     if (mark_res) db_free(mark_res);
 
-    // Parse email file
     parsed_email_t *email = parse_eml_file(file_path);
     db_free(res);
 
@@ -290,7 +277,6 @@ void handle_email_view(int client_fd, http_req_t *req) {
         return;
     }
 
-    // Escape all fields for HTML display to prevent XSS
     char *escaped_from = html_escape(email->from);
     char *escaped_to = html_escape(email->to);
     char *escaped_subject = html_escape(email->subject);
@@ -318,7 +304,6 @@ void handle_email_view(int client_fd, http_req_t *req) {
     free_parsed_email(email);
 }
 
-// Static file handler for CSS
 void handle_static(int client_fd, http_req_t *req) {
     serve_file(client_fd, req->path);
 }
@@ -334,26 +319,21 @@ void handle_log(int client_fd, http_req_t *req __attribute__((unused))) {
 void load_routes() {
     const char *sub = get_web_subdomain();
 
-    // Static files
     add_route("GET", "/robots.txt", sub, handle_robots);
     add_route("GET", "/css/*", sub, handle_static);
 
-    // Auth routes
     add_route("GET", "/login", sub, handle_login_page);
     add_route("POST", "/login", sub, handle_login_submit);
     add_route("GET", "/register", sub, handle_register_page);
     add_route("POST", "/register", sub, handle_register_submit);
     add_route("GET", "/logout", sub, handle_logout);
 
-    // Protected routes
     add_route("GET", "/", sub, handle_inbox);
     add_route("GET", "/email/*", sub, handle_email_view);
 
-    // Debug
     add_route("GET", "/log", sub, handle_log);
 }
 
-// Standalone entry point (used when building web server separately)
 #ifndef UNIFIED_BUILD
 int main(void) {
     set_log_file("web");
