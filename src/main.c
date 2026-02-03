@@ -1,10 +1,12 @@
-#include "postgre.h"
+#include "db.h"
 #include "smtp.h"
-#include "util.h"
+#include "config.h"
+#include "log.h"
 
 extern SSL_CTX *global_ssl_context;
 
 int main(void) {
+    set_log_file("smtp");
     load_env(".env");
 
     int r = db_init("localhost", "mmail", "mmail_user", get_db_password());

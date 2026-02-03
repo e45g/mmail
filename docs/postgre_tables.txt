@@ -30,3 +30,15 @@ CREATE TABLE user_inbox (
 );
 
 CREATE INDEX idx_inbox_fast_load ON user_inbox(user_id, deleted_at) INCLUDE (email_id, is_read);
+
+-- 4. Sessions Table (Web UI Authentication)
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(64) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_sessions_token ON sessions(token);
+CREATE INDEX idx_sessions_expires ON sessions(expires_at);

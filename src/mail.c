@@ -8,7 +8,6 @@
 #include <sys/epoll.h>
 #include <fcntl.h>
 
-#include "postgre.h"
 #include "smtp.h"
 #include "util.h"
 
@@ -22,7 +21,7 @@ void handle_critical_err(const char *msg, int sckt) {
     exit(1);
 }
 
-int set_non_blocking(int sock) {
+static int set_non_blocking(int sock) {
     int flags = fcntl(sock, F_GETFL, 0);
     if (flags == -1) return -1;
     return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
@@ -114,9 +113,9 @@ cmd_result_t handle_smtp_client(smtp_session_t *session) {
     return CMD_OK;
 }
 
-volatile sig_atomic_t keep_running = 1;
+static volatile sig_atomic_t keep_running = 1;
 
-void handle_sigint(int sig) {
+static void handle_sigint(int sig) {
     (void)sig;
     keep_running = 0;
 }
@@ -125,7 +124,7 @@ int mail_run(void) {
     signal(SIGPIPE, SIG_IGN);
     signal(SIGINT, handle_sigint);
 
-    const int port = get_port();
+    const int port = get_smtp_port();
 
     init_openssl();
     int sckt = socket(AF_INET, SOCK_STREAM, 0);

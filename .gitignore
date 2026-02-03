@@ -1,4 +1,21 @@
+# Build outputs
+build/
+
+# Logs
+logs/
+
+# SSL certificates
 key.pem
 cert.pem
-mmail
+
+# Environment
 .env
+
+# Old build artifacts (to be cleaned up)
+mmail
+mmail-smtp
+mmail-web
+*.o
+*.a
+
+emails/

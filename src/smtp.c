@@ -9,9 +9,74 @@
 
 #include "util.h"
 #include "smtp.h"
-#include "postgre.h"
+#include "db.h"
 
 extern SSL_CTX *global_ssl_context;
+
+static char *extract_header(const char *content, const char *header_name) {
+    if (!content || !header_name) return NULL;
+
+    size_t name_len = strlen(header_name);
+    const char *pos = content;
+
+    while ((pos = strcasestr(pos, header_name)) != NULL) {
+        if (pos != content && *(pos - 1) != '\n') {
+            pos++;
+            continue;
+        }
+        if (*(pos + name_len) != ':') {
+            pos++;
+            continue;
+        }
+
+        const char *value_start = pos + name_len + 1;
+        while (*value_start == ' ' || *value_start == '\t') value_start++;
+
+        const char *value_end = value_start;
+        while (*value_end && *value_end != '\r' && *value_end != '\n') value_end++;
+
+        size_t value_len = value_end - value_start;
+        if (value_len == 0) return NULL;
+        if (value_len > 255) value_len = 255;
+
+        char *value = malloc(value_len + 1);
+        if (!value) return NULL;
+        memcpy(value, value_start, value_len);
+        value[value_len] = '\0';
+        return value;
+    }
+    return NULL;
+}
+
+static char *extract_snippet(const char *content, size_t max_len) {
+    if (!content) return NULL;
+
+    const char *body = strstr(content, "\r\n\r\n");
+    if (!body) body = strstr(content, "\n\n");
+    if (body) body += (body[1] == '\n') ? 2 : 4;
+    else body = content;  // No headers, entire content is body
+
+    while (*body && (*body == ' ' || *body == '\t' || *body == '\r' || *body == '\n')) body++;
+
+    if (!*body) return NULL;
+
+    size_t len = strlen(body);
+    if (len > max_len) len = max_len;
+
+    char *snippet = malloc(len + 1);
+    if (!snippet) return NULL;
+
+    size_t j = 0;
+    for (size_t i = 0; i < len && body[i]; i++) {
+        if (body[i] == '\r' || body[i] == '\n' || body[i] == '\t') {
+            if (j > 0 && snippet[j-1] != ' ') snippet[j++] = ' ';
+        } else {
+            snippet[j++] = body[i];
+        }
+    }
+    snippet[j] = '\0';
+    return snippet;
+}
 
 static int parse_mail(const char *cmd, char *out, size_t out_sz)
 {
@@ -37,7 +102,7 @@ static int parse_mail(const char *cmd, char *out, size_t out_sz)
 }
 
 int store_email(smtp_session_t *s) {
-    // TOOO: Make the path configurable
+    // TODO: Make the path configurable
     mkdir("emails", 0700);
 
     char file_path[256];
@@ -48,16 +113,22 @@ int store_email(smtp_session_t *s) {
     fwrite(s->buffer, 1, strlen(s->buffer), f);
     fclose(f);
 
-    const char *query = "INSERT INTO emails (sender_address, file_path, size_bytes) "
-                        "VALUES ($1, $2, $3) RETURNING id";
+    char *subject = extract_header(s->buffer, "Subject");
+    char *snippet = extract_snippet(s->buffer, 200);
+
+    const char *query = "INSERT INTO emails (sender_address, subject, snippet, file_path, size_bytes) "
+                        "VALUES ($1, $2, $3, $4, $5) RETURNING id";
     char size_str[32];
     snprintf(size_str, sizeof(size_str), "%zu", strlen(s->buffer));
 
-    const char *params[] = {s->sender, file_path, size_str};
-    db_result_t *res = db_prepare(query, params, 3);
+    const char *params[] = {s->sender, subject ? subject : "", snippet ? snippet : "", file_path, size_str};
+    db_result_t *res = db_prepare(query, params, 5);
+
+    free(subject);
+    free(snippet);
 
     if (!res || res->num_rows == 0) {
-        db_free(res);
+        if (res) db_free(res);
         return -1;
     }
     char *email_id = strdup(res->rows[0][0]);
@@ -70,7 +141,7 @@ int store_email(smtp_session_t *s) {
             const char *inbox_params[] = {u_res->rows[0][0], email_id};
             db_prepare("INSERT INTO user_inbox (user_id, email_id) VALUES ($1, $2)", inbox_params, 2);
         }
-        db_free(u_res);
+        if (u_res) db_free(u_res);
     }
 
     free(email_id);

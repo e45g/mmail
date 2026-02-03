@@ -1,14 +1,13 @@
+#include "db.h"
+#include "log.h"
 #include <libpq-fe.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "postgre.h"
-#include "util.h"
+static PGconn *conn = NULL;
 
-PGconn *conn = NULL;
-
-int resolve_result(PGresult *res) {
+static int resolve_result(PGresult *res) {
     ExecStatusType r = PQresultStatus(res);
     switch(r) {
         case PGRES_BAD_RESPONSE: return -1;
@@ -122,7 +121,6 @@ db_result_t *db_prepare(const char *query, const char **params, int param_count)
 
     PQclear(res);
     return result;
-
 }
 
 void db_free(db_result_t *result) {
