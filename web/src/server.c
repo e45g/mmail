@@ -505,7 +505,7 @@ server_status_t serve_file(int client_fd, const char* path) {
         "Content-Type: %s\r\n"
         "Content-Length: %ld\r\n"
         "Connection: keep-alive\r\n"
-        "Server: hehe/1.0\r\n"
+        "Server: mmail/1.0\r\n"
         "\r\n",
         mime_type, st.st_size);
 

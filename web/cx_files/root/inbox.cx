@@ -48,7 +48,6 @@
 
                     const char *unread_class = (strcmp(is_read, "f") == 0) ? " unread" : "";
 
-                    // Escape HTML to prevent XSS
                     char *safe_sender = html_escape(sender);
                     char *safe_subject = html_escape(subject && strlen(subject) > 0 ? subject : "(No subject)");
                     char *safe_snippet = html_escape(snippet && strlen(snippet) > 0 ? snippet : "");

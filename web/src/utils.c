@@ -69,7 +69,7 @@ char* sanitize_path(const char* path) {
             }
         }
 
-        if (isalnum(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/') {
+        if (isalnum(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/' || *src == '%') {
             *dst++ = *src;
         } else {
             free(sanitized);
@@ -111,8 +111,6 @@ int validate_header(const char* name, const char* value) {
         if (!isalnum(c) && c != '-' && c != '_') return 0;
     }
 
-    // Note: Content-Length is needed for body parsing, don't filter it
-    // Transfer-Encoding chunked is not supported
     if (strcasecmp(name, "transfer-encoding") == 0) return 0;
 
     return 1;

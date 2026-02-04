@@ -141,6 +141,128 @@ static char *base64_decode(const char *input, size_t len) {
     return output;
 }
 
+static char *extract_boundary(const char *content_type) {
+    if (!content_type) return NULL;
+
+    const char *bp = strcasestr(content_type, "boundary=");
+    if (!bp) return NULL;
+
+    bp += 9; // skip "boundary="
+
+    if (*bp == '"') {
+        bp++;
+        const char *end = strchr(bp, '"');
+        if (!end) return NULL;
+        return strndup(bp, end - bp);
+    }
+
+    const char *end = bp;
+    while (*end && *end != ';' && *end != ' ' && *end != '\t' && *end != '\r' && *end != '\n') {
+        end++;
+    }
+    return strndup(bp, end - bp);
+}
+
+static char *quoted_printable_decode(const char *input, size_t len) {
+    char *output = malloc(len + 1);
+    if (!output) return NULL;
+
+    size_t j = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (input[i] == '=' && i + 1 < len) {
+            if (input[i+1] == '\r' || input[i+1] == '\n') {
+                if (input[i+1] == '\r' && i + 2 < len && input[i+2] == '\n') i += 2;
+                else i += 1;
+            } else if (i + 2 < len && isxdigit(input[i+1]) && isxdigit(input[i+2])) {
+                char hex[3] = {input[i+1], input[i+2], '\0'};
+                output[j++] = (char)strtol(hex, NULL, 16);
+                i += 2;
+            } else {
+                output[j++] = input[i];
+            }
+        } else {
+            output[j++] = input[i];
+        }
+    }
+    output[j] = '\0';
+    return output;
+}
+
+static char *extract_text_plain_part(const char *body, const char *boundary) {
+    if (!body || !boundary) return NULL;
+
+    char delimiter[256];
+    snprintf(delimiter, sizeof(delimiter), "--%s", boundary);
+    size_t delim_len = strlen(delimiter);
+
+    const char *part_start = strstr(body, delimiter);
+
+    while (part_start) {
+        part_start += delim_len;
+
+        if (strncmp(part_start, "--", 2) == 0) break;
+
+        while (*part_start == '\r' || *part_start == '\n') part_start++;
+
+        const char *part_body = strstr(part_start, "\r\n\r\n");
+        if (!part_body) part_body = strstr(part_start, "\n\n");
+        if (!part_body) break;
+
+        size_t headers_len = part_body - part_start;
+        char *part_headers = strndup(part_start, headers_len);
+
+        part_body += (part_body[1] == '\n') ? 2 : 4;
+
+        const char *next_delim = strstr(part_body, delimiter);
+        size_t body_len = next_delim ? (size_t)(next_delim - part_body) : strlen(part_body);
+
+        while (body_len > 0 && (part_body[body_len-1] == '\r' || part_body[body_len-1] == '\n')) {
+            body_len--;
+        }
+
+        char *ct = extract_header(part_headers, "Content-Type");
+        if (ct && strcasestr(ct, "text/plain")) {
+            char *encoding = extract_header(part_headers, "Content-Transfer-Encoding");
+            char *result = NULL;
+
+            if (encoding && strcasestr(encoding, "base64")) {
+                result = base64_decode(part_body, body_len);
+            } else if (encoding && strcasestr(encoding, "quoted-printable")) {
+                result = quoted_printable_decode(part_body, body_len);
+            } else {
+                result = strndup(part_body, body_len);
+            }
+
+            free(ct);
+            free(encoding);
+            free(part_headers);
+            return result;
+        }
+
+        if (ct && strcasestr(ct, "multipart/")) {
+            char *nested_boundary = extract_boundary(ct);
+            if (nested_boundary) {
+                char *nested_body = strndup(part_body, body_len);
+                char *result = extract_text_plain_part(nested_body, nested_boundary);
+                free(nested_body);
+                free(nested_boundary);
+                if (result) {
+                    free(ct);
+                    free(part_headers);
+                    return result;
+                }
+            }
+        }
+
+        free(ct);
+        free(part_headers);
+
+        part_start = next_delim;
+    }
+
+    return NULL; // No text/plain found
+}
+
 char *decode_mime_header(const char *encoded) {
     if (!encoded) return NULL;
 
@@ -273,7 +395,18 @@ parsed_email_t *parse_eml_file(const char *file_path) {
     if (date_raw) free(date_raw);
 
     if (body_start && *body_start) {
-        email->body = strdup(body_start);
+        if (email->content_type && strcasestr(email->content_type, "multipart/")) {
+            char *boundary = extract_boundary(email->content_type);
+            if (boundary) {
+                char *plain = extract_text_plain_part(body_start, boundary);
+                email->body = plain ? plain : strdup(body_start);
+                free(boundary);
+            } else {
+                email->body = strdup(body_start);
+            }
+        } else {
+            email->body = strdup(body_start);
+        }
     } else {
         email->body = strdup("");
     }
