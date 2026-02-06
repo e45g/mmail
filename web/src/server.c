@@ -606,45 +606,45 @@ static void handle_static_file(int client_fd, http_req_t *req) {
     }
 }
 
-static server_status_t read_full_body(int client_fd, http_req_t *req, buffer_t *buf) {
+static server_status_t read_full_body(int client_fd, http_req_t *req) {
     char *content_len_header = get_header(req, "Content-Length");
     if (!content_len_header) {
         return SERVER_OK;
     }
 
-    int content_length = atoi(content_len_header);
-    if (content_length <= 0 || content_length > MAX_REQUEST_SIZE) {
+    long content_length = atol(content_len_header);
+    if (content_length < 0 || content_length > MAX_REQUEST_SIZE) {
         return SERVER_ERR_PROTOCOL;
     }
-
-    const char *body_start = strstr(buf->data, "\r\n\r\n");
-    if (!body_start) {
-        return SERVER_ERR_PROTOCOL;
+    if (content_length == 0) {
+        if(req->body) *req->body = '\0';
+        return SERVER_OK;
     }
-    body_start += 4;
 
-    int body_received = buf->data + strlen(buf->data) - body_start;
+    ssize_t body_received = req->body ? strlen(req->body) : 0;
 
-    while (body_received < content_length) {
-        ssize_t more = recv(client_fd, buf->data, buf->size - 1, 0);
-        if (more <= 0) {
+    if (body_received >= content_length) {
+        req->body[content_length] = '\0';
+        return SERVER_OK;
+    }
+
+    char* full_body = realloc(req->body, content_length + 1);
+    if (!full_body) {
+        return SERVER_ERR_MEMORY;
+    }
+    req->body = full_body;
+
+    ssize_t remaining = content_length - body_received;
+    while (remaining > 0) {
+        ssize_t bytes = recv(client_fd, req->body + body_received, remaining, 0);
+        if (bytes <= 0) {
             return SERVER_ERR_NETWORK;
         }
-
-        buf->data[more] = '\0';
-
-        char *temp = malloc(strlen(req->body) + more + 1);
-        if (!temp) {
-            return SERVER_ERR_MEMORY;
-        }
-
-        strcpy(temp, req->body);
-        strcat(temp, buf->data);
-        free(req->body);
-        req->body = temp;
-
-        body_received += more;
+        body_received += bytes;
+        remaining -= bytes;
     }
+
+    req->body[content_length] = '\0';
 
     return SERVER_OK;
 }
@@ -706,7 +706,7 @@ void handle_client(int client_fd) {
 
     LOG("request: %s %s", req.method, req.path);
 
-    status = read_full_body(client_fd, &req, request_buf);
+    status = read_full_body(client_fd, &req);
     if (status != SERVER_OK) {
         send_error_response(client_fd, ERR_BADREQ);
         cleanup_request(&req, request_buf, conn, client_fd, 1);
